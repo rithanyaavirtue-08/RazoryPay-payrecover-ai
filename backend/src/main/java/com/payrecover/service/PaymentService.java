@@ -1,12 +1,14 @@
 package com.payrecover.service;
 
 import com.payrecover.dto.PaymentDTO;
+import com.payrecover.dto.RevenueAtRiskDTO;
 import com.payrecover.entity.Payment;
 import com.payrecover.repository.PaymentRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,6 +39,25 @@ public class PaymentService {
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment not found"));
         return mapToDTO(payment);
+    }
+
+    public RevenueAtRiskDTO calculateRevenueAtRisk() {
+        String status = "FAILED";
+        
+        BigDecimal totalAtRiskAmount = paymentRepository.sumAmountByStatus(status);
+        if (totalAtRiskAmount == null) {
+            totalAtRiskAmount = BigDecimal.ZERO;
+        }
+        
+        long failedPaymentCount = paymentRepository.countByStatus(status);
+        long eligiblePaymentCount = paymentRepository.countByStatusAndAttemptCountLessThan(status, 3);
+        
+        RevenueAtRiskDTO dto = new RevenueAtRiskDTO();
+        dto.setTotalAtRiskAmount(totalAtRiskAmount);
+        dto.setFailedPaymentCount(failedPaymentCount);
+        dto.setEligiblePaymentCount(eligiblePaymentCount);
+        
+        return dto;
     }
 
     private void mapToEntity(PaymentDTO dto, Payment entity) {
