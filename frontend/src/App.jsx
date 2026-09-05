@@ -10,17 +10,27 @@ const emptyForm = {
   customerEmail: '',
 }
 
+const emptyRazorpayForm = {
+  amount: '',
+  currency: 'INR',
+  customerEmail: '',
+}
+
 function App() {
   const [health, setHealth] = useState(null)
   const [payments, setPayments] = useState([])
   const [revenueAtRisk, setRevenueAtRisk] = useState(null)
   const [recoveryHistory, setRecoveryHistory] = useState([])
+  const [razorpayConfig, setRazorpayConfig] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  const [razorpayForm, setRazorpayForm] = useState(emptyRazorpayForm)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [analyzingId, setAnalyzingId] = useState(null)
   const [executingId, setExecutingId] = useState(null)
+  const [simulatingId, setSimulatingId] = useState(null)
+  const [creatingOrder, setCreatingOrder] = useState(false)
   const [recommendations, setRecommendations] = useState({})
 
   const loadData = async () => {
@@ -28,11 +38,12 @@ function App() {
     setError('')
 
     try {
-      const [healthRes, paymentsRes, revenueRes, historyRes] = await Promise.all([
+      const [healthRes, paymentsRes, revenueRes, historyRes, configRes] = await Promise.all([
         fetch('/api/health'),
         fetch('/api/payments'),
         fetch('/api/revenue-at-risk'),
         fetch('/api/recovery/history'),
+        fetch('/api/razorpay/config'),
       ])
 
       if (!healthRes.ok || !paymentsRes.ok || !revenueRes.ok) {
@@ -42,6 +53,10 @@ function App() {
       setHealth(await healthRes.json())
       setPayments(await paymentsRes.json())
       setRevenueAtRisk(await revenueRes.json())
+
+      if (configRes.ok) {
+        setRazorpayConfig(await configRes.json())
+      }
 
       if (historyRes.ok) {
         const history = await historyRes.json()
@@ -78,6 +93,111 @@ function App() {
     setForm((current) => ({ ...current, [name]: value }))
   }
 
+  const handleRazorpayChange = (event) => {
+    const { name, value } = event.target
+    setRazorpayForm((current) => ({ ...current, [name]: value }))
+  }
+
+  const openRazorpayCheckout = (order) => {
+    if (!window.Razorpay || !order.razorpayKeyId) {
+      setMessage(
+        `Razorpay order created (${order.paymentId}). Use Simulate Failure to test recovery flow.`
+      )
+      return
+    }
+
+    const options = {
+      key: order.razorpayKeyId,
+      amount: Math.round(Number(order.amount) * 100),
+      currency: order.currency,
+      name: 'PayRecover AI',
+      description: 'Payment recovery demo',
+      order_id: order.razorpayOrderId,
+      prefill: {
+        email: razorpayForm.customerEmail || '',
+      },
+      theme: { color: '#2563eb' },
+      handler: () => {
+        setMessage(`Payment completed for ${order.paymentId}. Refreshing status...`)
+        setTimeout(loadData, 1500)
+      },
+      modal: {
+        ondismiss: () => {
+          setMessage('Checkout closed. Use Simulate Failure if payment did not complete.')
+        },
+      },
+    }
+
+    const checkout = new window.Razorpay(options)
+    checkout.open()
+  }
+
+  const handleRazorpayOrder = async (event) => {
+    event.preventDefault()
+    setCreatingOrder(true)
+    setError('')
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/razorpay/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Number(razorpayForm.amount),
+          currency: razorpayForm.currency,
+          customerEmail: razorpayForm.customerEmail || null,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.message || 'Could not create Razorpay order')
+      }
+
+      const order = await response.json()
+      setRazorpayForm(emptyRazorpayForm)
+      await loadData()
+
+      if (order.simulationMode) {
+        setMessage(
+          `Simulation order created (${order.paymentId}). Click Simulate Failure to trigger recovery.`
+        )
+      } else {
+        openRazorpayCheckout(order)
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to create Razorpay order')
+    } finally {
+      setCreatingOrder(false)
+    }
+  }
+
+  const handleSimulateFailure = async (paymentId) => {
+    setSimulatingId(paymentId)
+    setError('')
+    setMessage('')
+
+    try {
+      const response = await fetch(`/api/razorpay/simulate-failure/${paymentId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ failureReason: 'card_declined' }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.message || 'Failed to simulate payment failure')
+      }
+
+      setMessage(`Payment ${paymentId} marked as FAILED. You can now Analyze it.`)
+      await loadData()
+    } catch (err) {
+      setError(err.message || `Failed to simulate failure for ${paymentId}`)
+    } finally {
+      setSimulatingId(null)
+    }
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setMessage('')
@@ -95,6 +215,7 @@ function App() {
           failureReason: form.failureReason || null,
           customerEmail: form.customerEmail || null,
           attemptCount: 1,
+          source: 'MANUAL',
         }),
       })
 
@@ -171,7 +292,9 @@ function App() {
       <header className="hero">
         <p className="eyebrow">Razorpay Recovery</p>
         <h1>PayRecover AI</h1>
-        <p className="subtitle">Analyze failed payments and execute AI recovery actions.</p>
+        <p className="subtitle">
+          Razorpay payments, AI analysis, and automated recovery actions.
+        </p>
       </header>
 
       <section className="panel">
@@ -208,12 +331,53 @@ function App() {
                 </div>
               </>
             )}
+            {razorpayConfig && (
+              <div className="stat-card">
+                <span>Razorpay</span>
+                <strong>{razorpayConfig.configured ? 'Live' : 'Simulation'}</strong>
+              </div>
+            )}
           </div>
         )}
       </section>
 
       <section className="panel">
-        <h2>Add Failed Payment</h2>
+        <h2>Pay with Razorpay</h2>
+        <p className="panel-note">
+          Creates a real Razorpay order when keys are configured, otherwise runs in simulation mode.
+        </p>
+        <form className="payment-form" onSubmit={handleRazorpayOrder}>
+          <input
+            name="amount"
+            type="number"
+            step="0.01"
+            placeholder="Amount (INR)"
+            value={razorpayForm.amount}
+            onChange={handleRazorpayChange}
+            required
+          />
+          <input
+            name="currency"
+            placeholder="Currency"
+            value={razorpayForm.currency}
+            onChange={handleRazorpayChange}
+            required
+          />
+          <input
+            name="customerEmail"
+            type="email"
+            placeholder="Customer email"
+            value={razorpayForm.customerEmail}
+            onChange={handleRazorpayChange}
+          />
+          <button type="submit" disabled={creatingOrder}>
+            {creatingOrder ? 'Creating Order...' : 'Create Razorpay Order'}
+          </button>
+        </form>
+      </section>
+
+      <section className="panel">
+        <h2>Add Manual Failed Payment</h2>
         <form className="payment-form" onSubmit={handleSubmit}>
           <input
             name="paymentId"
@@ -270,6 +434,7 @@ function App() {
               <thead>
                 <tr>
                   <th>Payment ID</th>
+                  <th>Source</th>
                   <th>Amount</th>
                   <th>Status</th>
                   <th>Attempts</th>
@@ -284,10 +449,18 @@ function App() {
                   const canAnalyze = payment.status?.toUpperCase() === 'FAILED'
                   const canExecute =
                     recommendation?.executionStatus === 'RECOMMENDED' && canAnalyze
+                  const canSimulate =
+                    payment.source === 'RAZORPAY' &&
+                    payment.status?.toUpperCase() === 'PENDING'
 
                   return (
                     <tr key={payment.id}>
                       <td>{payment.paymentId}</td>
+                      <td>
+                        <span className={`badge source-${payment.source?.toLowerCase()}`}>
+                          {payment.source || 'MANUAL'}
+                        </span>
+                      </td>
                       <td>
                         {payment.amount} {payment.currency}
                       </td>
@@ -316,6 +489,18 @@ function App() {
                       </td>
                       <td>
                         <div className="action-buttons">
+                          {canSimulate && (
+                            <button
+                              type="button"
+                              className="simulate-btn"
+                              onClick={() => handleSimulateFailure(payment.paymentId)}
+                              disabled={simulatingId === payment.paymentId}
+                            >
+                              {simulatingId === payment.paymentId
+                                ? 'Simulating...'
+                                : 'Simulate Failure'}
+                            </button>
+                          )}
                           {canAnalyze && (
                             <button
                               type="button"
@@ -340,7 +525,7 @@ function App() {
                                 : 'Execute'}
                             </button>
                           )}
-                          {!canAnalyze && !canExecute && '-'}
+                          {!canAnalyze && !canExecute && !canSimulate && '-'}
                         </div>
                       </td>
                     </tr>

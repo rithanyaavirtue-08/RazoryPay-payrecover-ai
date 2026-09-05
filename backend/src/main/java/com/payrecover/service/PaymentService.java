@@ -70,6 +70,17 @@ public class PaymentService {
         if (dto.getAttemptCount() != null) {
             entity.setAttemptCount(dto.getAttemptCount());
         }
+        if (dto.getRazorpayOrderId() != null) {
+            entity.setRazorpayOrderId(dto.getRazorpayOrderId());
+        }
+        if (dto.getRazorpayPaymentId() != null) {
+            entity.setRazorpayPaymentId(dto.getRazorpayPaymentId());
+        }
+        if (dto.getSource() != null) {
+            entity.setSource(dto.getSource());
+        } else if (entity.getSource() == null) {
+            entity.setSource("MANUAL");
+        }
     }
 
     private PaymentDTO mapToDTO(Payment entity) {
@@ -82,6 +93,9 @@ public class PaymentService {
         dto.setFailureReason(entity.getFailureReason());
         dto.setCustomerEmail(entity.getCustomerEmail());
         dto.setAttemptCount(entity.getAttemptCount());
+        dto.setRazorpayOrderId(entity.getRazorpayOrderId());
+        dto.setRazorpayPaymentId(entity.getRazorpayPaymentId());
+        dto.setSource(entity.getSource());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
         return dto;

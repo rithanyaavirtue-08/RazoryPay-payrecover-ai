@@ -3,12 +3,17 @@ d:\RazorPay-Project\backend\src\main\java\com\payrecover\config\WebConfig.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\controller\AIAnalysisController.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\controller\HealthController.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\controller\PaymentController.java
+d:\RazorPay-Project\backend\src\main\java\com\payrecover\controller\RazorpayController.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\controller\RecoveryController.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\controller\RootController.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\dto\AIAnalysisResponse.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\dto\PaymentDTO.java
+d:\RazorPay-Project\backend\src\main\java\com\payrecover\dto\RazorpayConfigResponse.java
+d:\RazorPay-Project\backend\src\main\java\com\payrecover\dto\RazorpayOrderRequest.java
+d:\RazorPay-Project\backend\src\main\java\com\payrecover\dto\RazorpayOrderResponse.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\dto\RecoveryActionDTO.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\dto\RevenueAtRiskDTO.java
+d:\RazorPay-Project\backend\src\main\java\com\payrecover\dto\SimulateFailureRequest.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\entity\Payment.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\entity\RecoveryAction.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\PayRecoverApplication.java
@@ -16,4 +21,5 @@ d:\RazorPay-Project\backend\src\main\java\com\payrecover\repository\PaymentRepos
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\repository\RecoveryActionRepository.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\service\AIAnalysisService.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\service\PaymentService.java
+d:\RazorPay-Project\backend\src\main\java\com\payrecover\service\RazorpayService.java
 d:\RazorPay-Project\backend\src\main\java\com\payrecover\service\RecoveryExecutionService.java

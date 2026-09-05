@@ -311,6 +311,38 @@ td {
   color: var(--text);
 }
 
+.panel-note {
+  color: var(--text);
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+
+.simulate-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 14px;
+  background: #f97316;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+}
+
+.simulate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.badge.source-razorpay {
+  background: rgba(37, 99, 235, 0.15);
+  color: #2563eb;
+}
+
+.badge.source-manual {
+  background: rgba(107, 114, 128, 0.15);
+  color: #6b7280;
+}
+
 @media (max-width: 768px) {
   .payment-form {
     grid-template-columns: 1fr;

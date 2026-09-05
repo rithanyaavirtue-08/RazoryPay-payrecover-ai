@@ -27,6 +27,9 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-root}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_API_MODEL: ${GEMINI_API_MODEL:-gemini-2.5-flash}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
     depends_on:
       mysql:
         condition: service_healthy

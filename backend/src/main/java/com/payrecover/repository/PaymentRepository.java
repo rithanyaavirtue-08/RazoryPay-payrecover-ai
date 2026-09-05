@@ -13,6 +13,8 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     Optional<Payment> findByPaymentId(String paymentId);
 
+    Optional<Payment> findByRazorpayOrderId(String razorpayOrderId);
+
     @Query("SELECT SUM(p.amount) FROM Payment p WHERE p.status = :status")
     BigDecimal sumAmountByStatus(String status);
 

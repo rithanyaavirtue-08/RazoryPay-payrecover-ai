@@ -18,12 +18,15 @@ public class RecoveryExecutionService {
 
     private final PaymentRepository paymentRepository;
     private final RecoveryActionRepository recoveryActionRepository;
+    private final RazorpayService razorpayService;
 
     public RecoveryExecutionService(
             PaymentRepository paymentRepository,
-            RecoveryActionRepository recoveryActionRepository) {
+            RecoveryActionRepository recoveryActionRepository,
+            RazorpayService razorpayService) {
         this.paymentRepository = paymentRepository;
         this.recoveryActionRepository = recoveryActionRepository;
+        this.razorpayService = razorpayService;
     }
 
     public RecoveryAction saveRecommendation(String paymentId, String action, String reason, double confidence) {
@@ -92,6 +95,12 @@ public class RecoveryExecutionService {
         if (attempts >= 3) {
             payment.setStatus("STOPPED");
             return "Max retry attempts reached (" + attempts + "). Payment marked as STOPPED.";
+        }
+
+        if ("RAZORPAY".equalsIgnoreCase(payment.getSource())) {
+            String orderId = razorpayService.createRetryOrder(payment);
+            payment.setStatus("PENDING");
+            return "Razorpay retry #" + attempts + " initiated. New order: " + orderId;
         }
 
         payment.setStatus("PENDING");

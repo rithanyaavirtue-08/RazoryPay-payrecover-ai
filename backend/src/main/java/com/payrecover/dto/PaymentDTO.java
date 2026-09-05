@@ -13,6 +13,9 @@ public class PaymentDTO {
     private String failureReason;
     private String customerEmail;
     private Integer attemptCount;
+    private String razorpayOrderId;
+    private String razorpayPaymentId;
+    private String source;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -41,6 +44,15 @@ public class PaymentDTO {
 
     public Integer getAttemptCount() { return attemptCount; }
     public void setAttemptCount(Integer attemptCount) { this.attemptCount = attemptCount; }
+
+    public String getRazorpayOrderId() { return razorpayOrderId; }
+    public void setRazorpayOrderId(String razorpayOrderId) { this.razorpayOrderId = razorpayOrderId; }
+
+    public String getRazorpayPaymentId() { return razorpayPaymentId; }
+    public void setRazorpayPaymentId(String razorpayPaymentId) { this.razorpayPaymentId = razorpayPaymentId; }
+
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
