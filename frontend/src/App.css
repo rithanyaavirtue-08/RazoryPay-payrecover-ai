@@ -60,6 +60,41 @@
   border-color: rgba(34, 197, 94, 0.35);
 }
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.stat-card.up {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.stat-card.risk {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.stat-card span {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.stat-card strong {
+  font-size: 24px;
+  color: var(--text-h);
+}
+
 .refresh,
 .payment-form button,
 .analyze-btn {

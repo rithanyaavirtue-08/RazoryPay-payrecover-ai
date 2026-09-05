@@ -13,6 +13,7 @@ const emptyForm = {
 function App() {
   const [health, setHealth] = useState(null)
   const [payments, setPayments] = useState([])
+  const [revenueAtRisk, setRevenueAtRisk] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -25,21 +26,24 @@ function App() {
     setError('')
 
     try {
-      const [healthRes, paymentsRes] = await Promise.all([
+      const [healthRes, paymentsRes, revenueRes] = await Promise.all([
         fetch('/api/health'),
         fetch('/api/payments'),
+        fetch('/api/revenue-at-risk'),
       ])
 
-      if (!healthRes.ok || !paymentsRes.ok) {
+      if (!healthRes.ok || !paymentsRes.ok || !revenueRes.ok) {
         throw new Error('Backend is not reachable')
       }
 
       setHealth(await healthRes.json())
       setPayments(await paymentsRes.json())
+      setRevenueAtRisk(await revenueRes.json())
     } catch (err) {
       setError(err.message || 'Failed to load data from backend')
       setHealth(null)
       setPayments([])
+      setRevenueAtRisk(null)
     } finally {
       setLoading(false)
     }
@@ -123,21 +127,40 @@ function App() {
 
       <section className="panel">
         <div className="panel-header">
-          <h2>Backend Status</h2>
+          <h2>Dashboard</h2>
           <button type="button" className="refresh" onClick={loadData}>
             Refresh
           </button>
         </div>
 
         {loading && <p>Loading...</p>}
-        {!loading && health && (
-          <div className="status-card up">
-            <span>API Health</span>
-            <strong>{health.status}</strong>
-          </div>
-        )}
         {!loading && error && <p className="error">{error}</p>}
         {!loading && message && <p className="message">{message}</p>}
+
+        {!loading && health && (
+          <div className="stats-grid">
+            <div className="stat-card up">
+              <span>API Health</span>
+              <strong>{health.status}</strong>
+            </div>
+            {revenueAtRisk && (
+              <>
+                <div className="stat-card risk">
+                  <span>Revenue at Risk</span>
+                  <strong>₹{revenueAtRisk.totalAtRiskAmount}</strong>
+                </div>
+                <div className="stat-card">
+                  <span>Failed Payments</span>
+                  <strong>{revenueAtRisk.failedPaymentCount}</strong>
+                </div>
+                <div className="stat-card">
+                  <span>Eligible for Recovery</span>
+                  <strong>{revenueAtRisk.eligiblePaymentCount}</strong>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="panel">

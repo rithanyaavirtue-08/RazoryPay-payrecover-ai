@@ -47,6 +47,10 @@ public class AIAnalysisService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment is not in FAILED status");
         }
 
+        if (apiKey == null || apiKey.isBlank()) {
+            return fallbackResponse("Gemini API key is not configured");
+        }
+
         String prompt = buildPrompt(payment);
         String jsonResponse = callLLM(prompt);
 
