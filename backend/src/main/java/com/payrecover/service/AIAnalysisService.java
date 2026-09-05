@@ -1,7 +1,9 @@
 package com.payrecover.service;
 
 import com.payrecover.dto.AIAnalysisResponse;
+import com.payrecover.dto.RecoveryActionDTO;
 import com.payrecover.entity.Payment;
+import com.payrecover.entity.RecoveryAction;
 import com.payrecover.repository.PaymentRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -19,6 +21,7 @@ import java.util.Set;
 public class AIAnalysisService {
 
     private final PaymentRepository paymentRepository;
+    private final RecoveryExecutionService recoveryExecutionService;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
@@ -33,13 +36,16 @@ public class AIAnalysisService {
 
     private static final Set<String> ALLOWED_ACTIONS = Set.of("RETRY", "REMINDER", "ESCALATE", "STOP");
 
-    public AIAnalysisService(PaymentRepository paymentRepository) {
+    public AIAnalysisService(
+            PaymentRepository paymentRepository,
+            RecoveryExecutionService recoveryExecutionService) {
         this.paymentRepository = paymentRepository;
+        this.recoveryExecutionService = recoveryExecutionService;
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
     }
 
-    public AIAnalysisResponse analyzePayment(String paymentId) {
+    public RecoveryActionDTO analyzePayment(String paymentId) {
         Payment payment = paymentRepository.findByPaymentId(paymentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment not found"));
 
@@ -48,13 +54,39 @@ public class AIAnalysisService {
         }
 
         if (apiKey == null || apiKey.isBlank()) {
-            return fallbackResponse("Gemini API key is not configured");
+            AIAnalysisResponse fallback = fallbackResponse("Gemini API key is not configured");
+            return saveAndMap(paymentId, fallback);
         }
 
         String prompt = buildPrompt(payment);
         String jsonResponse = callLLM(prompt);
 
-        return validateAndParseResponse(jsonResponse);
+        AIAnalysisResponse response = validateAndParseResponse(jsonResponse);
+        return saveAndMap(paymentId, response);
+    }
+
+    private RecoveryActionDTO saveAndMap(String paymentId, AIAnalysisResponse response) {
+        RecoveryAction saved = recoveryExecutionService.saveRecommendation(
+                paymentId,
+                response.getAction(),
+                response.getReason(),
+                response.getConfidence()
+        );
+        return mapToDTO(saved);
+    }
+
+    private RecoveryActionDTO mapToDTO(RecoveryAction entity) {
+        RecoveryActionDTO dto = new RecoveryActionDTO();
+        dto.setId(entity.getId());
+        dto.setPaymentId(entity.getPaymentId());
+        dto.setAction(entity.getAction());
+        dto.setReason(entity.getReason());
+        dto.setConfidence(entity.getConfidence());
+        dto.setExecutionStatus(entity.getExecutionStatus());
+        dto.setExecutionMessage(entity.getExecutionMessage());
+        dto.setCreatedAt(entity.getCreatedAt());
+        dto.setExecutedAt(entity.getExecutedAt());
+        return dto;
     }
 
     private String buildPrompt(Payment payment) {

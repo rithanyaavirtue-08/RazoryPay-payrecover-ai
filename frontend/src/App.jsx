@@ -14,22 +14,25 @@ function App() {
   const [health, setHealth] = useState(null)
   const [payments, setPayments] = useState([])
   const [revenueAtRisk, setRevenueAtRisk] = useState(null)
+  const [recoveryHistory, setRecoveryHistory] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [analyzingId, setAnalyzingId] = useState(null)
-  const [analysisResults, setAnalysisResults] = useState({})
+  const [executingId, setExecutingId] = useState(null)
+  const [recommendations, setRecommendations] = useState({})
 
   const loadData = async () => {
     setLoading(true)
     setError('')
 
     try {
-      const [healthRes, paymentsRes, revenueRes] = await Promise.all([
+      const [healthRes, paymentsRes, revenueRes, historyRes] = await Promise.all([
         fetch('/api/health'),
         fetch('/api/payments'),
         fetch('/api/revenue-at-risk'),
+        fetch('/api/recovery/history'),
       ])
 
       if (!healthRes.ok || !paymentsRes.ok || !revenueRes.ok) {
@@ -39,11 +42,28 @@ function App() {
       setHealth(await healthRes.json())
       setPayments(await paymentsRes.json())
       setRevenueAtRisk(await revenueRes.json())
+
+      if (historyRes.ok) {
+        const history = await historyRes.json()
+        setRecoveryHistory(history)
+
+        const latestByPayment = {}
+        history.forEach((item) => {
+          if (
+            !latestByPayment[item.paymentId] ||
+            item.executionStatus === 'RECOMMENDED'
+          ) {
+            latestByPayment[item.paymentId] = item
+          }
+        })
+        setRecommendations(latestByPayment)
+      }
     } catch (err) {
       setError(err.message || 'Failed to load data from backend')
       setHealth(null)
       setPayments([])
       setRevenueAtRisk(null)
+      setRecoveryHistory([])
     } finally {
       setLoading(false)
     }
@@ -93,6 +113,7 @@ function App() {
   const handleAnalyze = async (paymentId) => {
     setAnalyzingId(paymentId)
     setError('')
+    setMessage('')
 
     try {
       const response = await fetch(`/api/ai/analyze/${paymentId}`, {
@@ -105,11 +126,12 @@ function App() {
       }
 
       const result = await response.json()
-      setAnalysisResults((current) => ({
+      setRecommendations((current) => ({
         ...current,
         [paymentId]: result,
       }))
-      setMessage(`AI analysis complete for ${paymentId}`)
+      setMessage(`AI recommends ${result.action} for ${paymentId}. Click Execute to apply.`)
+      await loadData()
     } catch (err) {
       setError(err.message || `Failed to analyze ${paymentId}`)
     } finally {
@@ -117,12 +139,39 @@ function App() {
     }
   }
 
+  const handleExecute = async (paymentId) => {
+    setExecutingId(paymentId)
+    setError('')
+    setMessage('')
+
+    try {
+      const response = await fetch(`/api/recovery/execute/${paymentId}`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.message || 'Failed to execute recovery action')
+      }
+
+      const result = await response.json()
+      setMessage(result.executionMessage || `Executed ${result.action} for ${paymentId}`)
+      await loadData()
+    } catch (err) {
+      setError(err.message || `Failed to execute action for ${paymentId}`)
+    } finally {
+      setExecutingId(null)
+    }
+  }
+
+  const getRecommendation = (paymentId) => recommendations[paymentId]
+
   return (
     <div className="app">
       <header className="hero">
         <p className="eyebrow">Razorpay Recovery</p>
         <h1>PayRecover AI</h1>
-        <p className="subtitle">Monitor failed payments and get AI recovery recommendations.</p>
+        <p className="subtitle">Analyze failed payments and execute AI recovery actions.</p>
       </header>
 
       <section className="panel">
@@ -223,62 +272,108 @@ function App() {
                   <th>Payment ID</th>
                   <th>Amount</th>
                   <th>Status</th>
+                  <th>Attempts</th>
                   <th>Reason</th>
-                  <th>Email</th>
-                  <th>AI Action</th>
+                  <th>AI Recommendation</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {payments.map((payment) => (
-                  <tr key={payment.id}>
-                    <td>{payment.paymentId}</td>
-                    <td>
-                      {payment.amount} {payment.currency}
-                    </td>
-                    <td>
-                      <span className={`badge ${payment.status?.toLowerCase()}`}>
-                        {payment.status}
-                      </span>
-                    </td>
-                    <td>{payment.failureReason || '-'}</td>
-                    <td>{payment.customerEmail || '-'}</td>
-                    <td>
-                      {payment.status?.toUpperCase() === 'FAILED' ? (
-                        <button
-                          type="button"
-                          className="analyze-btn"
-                          onClick={() => handleAnalyze(payment.paymentId)}
-                          disabled={analyzingId === payment.paymentId}
-                        >
-                          {analyzingId === payment.paymentId ? 'Analyzing...' : 'Analyze'}
-                        </button>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {payments.map((payment) => {
+                  const recommendation = getRecommendation(payment.paymentId)
+                  const canAnalyze = payment.status?.toUpperCase() === 'FAILED'
+                  const canExecute =
+                    recommendation?.executionStatus === 'RECOMMENDED' && canAnalyze
+
+                  return (
+                    <tr key={payment.id}>
+                      <td>{payment.paymentId}</td>
+                      <td>
+                        {payment.amount} {payment.currency}
+                      </td>
+                      <td>
+                        <span className={`badge ${payment.status?.toLowerCase()}`}>
+                          {payment.status}
+                        </span>
+                      </td>
+                      <td>{payment.attemptCount ?? 0}</td>
+                      <td>{payment.failureReason || '-'}</td>
+                      <td>
+                        {recommendation ? (
+                          <div className="recommendation-cell">
+                            <span
+                              className={`badge action-${recommendation.action?.toLowerCase()}`}
+                            >
+                              {recommendation.action}
+                            </span>
+                            <span className="recommendation-status">
+                              {recommendation.executionStatus}
+                            </span>
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          {canAnalyze && (
+                            <button
+                              type="button"
+                              className="analyze-btn"
+                              onClick={() => handleAnalyze(payment.paymentId)}
+                              disabled={analyzingId === payment.paymentId}
+                            >
+                              {analyzingId === payment.paymentId
+                                ? 'Analyzing...'
+                                : 'Analyze'}
+                            </button>
+                          )}
+                          {canExecute && (
+                            <button
+                              type="button"
+                              className="execute-btn"
+                              onClick={() => handleExecute(payment.paymentId)}
+                              disabled={executingId === payment.paymentId}
+                            >
+                              {executingId === payment.paymentId
+                                ? 'Executing...'
+                                : 'Execute'}
+                            </button>
+                          )}
+                          {!canAnalyze && !canExecute && '-'}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
       </section>
 
-      {Object.keys(analysisResults).length > 0 && (
+      {recoveryHistory.length > 0 && (
         <section className="panel">
-          <h2>AI Recommendations</h2>
+          <h2>Recovery History</h2>
           <div className="analysis-list">
-            {Object.entries(analysisResults).map(([paymentId, result]) => (
-              <div key={paymentId} className="analysis-card">
+            {recoveryHistory.map((item) => (
+              <div key={item.id} className="analysis-card">
                 <div className="analysis-header">
-                  <strong>{paymentId}</strong>
-                  <span className={`badge action-${result.action?.toLowerCase()}`}>
-                    {result.action}
+                  <strong>{item.paymentId}</strong>
+                  <span className={`badge action-${item.action?.toLowerCase()}`}>
+                    {item.action}
+                  </span>
+                  <span className={`badge status-${item.executionStatus?.toLowerCase()}`}>
+                    {item.executionStatus}
                   </span>
                 </div>
-                <p>{result.reason}</p>
+                <p>{item.reason}</p>
+                {item.executionMessage && (
+                  <p className="execution-message">{item.executionMessage}</p>
+                )}
                 <p className="confidence">
-                  Confidence: {(result.confidence * 100).toFixed(0)}%
+                  Confidence: {(item.confidence * 100).toFixed(0)}%
+                  {item.executedAt && ` · Executed: ${new Date(item.executedAt).toLocaleString()}`}
                 </p>
               </div>
             ))}
